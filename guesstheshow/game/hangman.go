@@ -15,6 +15,7 @@ func Play(wordList []string) {
 	word := wordList[rand.Intn(len(wordList))]
 	wordLower := strings.ToLower(word)
 
+	// Initialize display with underscores, preserve spaces
 	display := make([]rune, len(word))
 	for i := range display {
 		if word[i] == ' ' {
@@ -34,13 +35,29 @@ func Play(wordList []string) {
 	printDisplay(display)
 
 	for incorrectGuesses < maxIncorrect && strings.Contains(string(display), "_") {
-		fmt.Print("Enter a letter or full word: ")
+		fmt.Print("Enter a letter or full word (or type 'steal' for other player to guess): ")
 		input, _ := reader.ReadString('\n')
 		guess := strings.ToLower(strings.TrimSpace(input))
 
-		if len(guess) == 1 {
-			letter := rune(guess[0])
+		if guess == "steal" {
+			// Steal attempt
+			fmt.Print("Other player, enter your full word guess: ")
+			stealGuess, _ := reader.ReadString('\n')
+			stealGuess = strings.ToLower(strings.TrimSpace(stealGuess))
 
+			if stealGuess == wordLower {
+				fmt.Printf("Other player wins! The word was: %s\n", word)
+				return
+			} else {
+				fmt.Println("Incorrect steal! Back to original player.")
+				printDisplay(display)
+				continue
+			}
+		}
+
+		if len(guess) == 1 {
+			// Single letter guess
+			letter := rune(guess[0])
 			if guessedLetters[letter] {
 				fmt.Println("You already guessed that letter.")
 				continue
@@ -60,6 +77,7 @@ func Play(wordList []string) {
 				fmt.Printf("Wrong! You have %d guesses left.\n", maxIncorrect-incorrectGuesses)
 			}
 		} else {
+			// Full word guess
 			normalizedGuess := strings.Join(strings.Fields(guess), " ")
 			if normalizedGuess == wordLower {
 				display = []rune(word)
