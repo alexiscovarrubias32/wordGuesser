@@ -26,7 +26,7 @@ func Play(wordList []string) {
 	}
 
 	incorrectGuesses := 0
-	const maxIncorrect = 3
+	const maxIncorrect = 6
 	guessedLetters := make(map[rune]bool)
 
 	reader := bufio.NewReader(os.Stdin)
