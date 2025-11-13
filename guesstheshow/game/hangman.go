@@ -31,26 +31,67 @@ func Play(wordList []string) {
 
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Println("\nLet's start! Guess the word or letters:")
+	fmt.Println("\nLet's start! You have 45 seconds per guess.")
 	printDisplay(display)
 
 	for incorrectGuesses < maxIncorrect && strings.Contains(string(display), "_") {
-		fmt.Print("Enter a letter or full word (or type 'steal' for other player to guess): ")
-		input, _ := reader.ReadString('\n')
-		guess := strings.ToLower(strings.TrimSpace(input))
+		// Concurrency for input with timeout
+		inputChan := make(chan string)
+		go func() {
+			fmt.Print("Enter a letter or full word (or type 'steal' for other player to guess): ")
+			input, _ := reader.ReadString('\n')
+			inputChan <- input
+		}()
+
+		timer := time.NewTimer(45 * time.Second)
+		var guess string
+
+		select {
+		case input := <-inputChan:
+			timer.Stop()
+			guess = strings.ToLower(strings.TrimSpace(input))
+		case <-timer.C:
+			fmt.Println("\nTime's up!")
+			incorrectGuesses++
+			fmt.Printf("That counts as a wrong guess. You have %d guesses left.\n", maxIncorrect-incorrectGuesses)
+			fmt.Println() 
+			printDisplay(display)
+			fmt.Println() 
+			continue
+		}
 
 		if guess == "steal" {
-			// Steal attempt
-			fmt.Print("Other player, enter your full word guess: ")
-			stealGuess, _ := reader.ReadString('\n')
-			stealGuess = strings.ToLower(strings.TrimSpace(stealGuess))
+			// Steal attempt with its own timeout
+			stealChan := make(chan string)
+			go func() {
+				fmt.Print("Second player, enter your full word guess: ")
+				stealGuess, _ := reader.ReadString('\n')
+				stealChan <- stealGuess
+			}()
+
+			stealTimer := time.NewTimer(45 * time.Second)
+			var stealGuess string
+
+			select {
+			case input := <-stealChan:
+				stealTimer.Stop()
+				stealGuess = strings.ToLower(strings.TrimSpace(input))
+			case <-stealTimer.C:
+				fmt.Println("\nTime's up for the steal attempt! Back to the original player.")
+				fmt.Println() 
+				printDisplay(display)
+				fmt.Println() 
+				continue
+			}
 
 			if stealGuess == wordLower {
 				fmt.Printf("Other player wins! The word was: %s\n", word)
 				return
 			} else {
 				fmt.Println("Incorrect steal! Back to original player.")
+				fmt.Println() 
 				printDisplay(display)
+				fmt.Println() 
 				continue
 			}
 		}
@@ -60,6 +101,7 @@ func Play(wordList []string) {
 			letter := rune(guess[0])
 			if guessedLetters[letter] {
 				fmt.Println("You already guessed that letter.")
+				fmt.Println() 
 				continue
 			}
 
@@ -76,7 +118,7 @@ func Play(wordList []string) {
 				incorrectGuesses++
 				fmt.Printf("Wrong! You have %d guesses left.\n", maxIncorrect-incorrectGuesses)
 			}
-		} else {
+		} else if len(guess) > 1 {
 			// Full word guess
 			normalizedGuess := strings.Join(strings.Fields(guess), " ")
 			if normalizedGuess == wordLower {
@@ -86,9 +128,13 @@ func Play(wordList []string) {
 				incorrectGuesses++
 				fmt.Printf("Wrong! You have %d guesses left.\n", maxIncorrect-incorrectGuesses)
 			}
+		} else {
+			// Handles empty input
+			fmt.Println("Invalid input. Please enter a guess.")
 		}
 
 		printDisplay(display)
+		fmt.Println() 
 	}
 
 	if strings.Contains(string(display), "_") {
